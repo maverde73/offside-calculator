@@ -998,7 +998,47 @@ function render() {
 }
 function findLine(pos) { const th = 12/view.scale; for (const l of lines) { if (Math.abs(l.geo.a * pos.x + l.geo.b * pos.y + l.geo.c) < th) return l; } return null; }
 function fitToView() { if (!image) return; const p = 40, sx = (container.clientWidth - p*2) / imageSize.width, sy = (container.clientHeight - p*2) / imageSize.height; view.scale = Math.min(sx, sy, 1); view.x = (container.clientWidth - imageSize.width * view.scale) / 2; view.y = (container.clientHeight - imageSize.height * view.scale) / 2; render(); }
-function loadImageFile(file) { const r = new FileReader(); r.onload = e => { const img = new Image(); img.onload = () => { image = img; imageSize = {width: img.width, height: img.height}; lines = []; vpPos = null; vpManual = false; history = ['[]']; historyIdx = 0; fitToView(); }; img.src = e.target.result; }; r.readAsDataURL(file); }
+function loadImageFile(file) {
+  // Check if there are existing lines
+  const hasExistingLines = lines.length > 0;
+
+  if (hasExistingLines) {
+    const message = lang === 'it'
+      ? 'Ci sono già delle linee disegnate. Vuoi mantenerle per la nuova immagine?\n\n• OK = Mantieni le linee\n• Annulla = Cancella tutto e ricomincia'
+      : 'There are existing lines. Do you want to keep them for the new image?\n\n• OK = Keep lines\n• Cancel = Clear all and start fresh';
+
+    const keepLines = confirm(message);
+
+    if (!keepLines) {
+      // Clear everything
+      lines = [];
+      vpPos = null;
+      vpManual = false;
+      history = ['[]'];
+      historyIdx = 0;
+    }
+    // If keepLines is true, we keep the existing lines, vpPos, and history
+  } else {
+    // No existing lines, clear everything
+    lines = [];
+    vpPos = null;
+    vpManual = false;
+    history = ['[]'];
+    historyIdx = 0;
+  }
+
+  const r = new FileReader();
+  r.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      image = img;
+      imageSize = {width: img.width, height: img.height};
+      fitToView();
+    };
+    img.src = e.target.result;
+  };
+  r.readAsDataURL(file);
+}
 
 canvas.addEventListener('mousedown', e => {
   const pos = toCanvas(e.clientX, e.clientY);
