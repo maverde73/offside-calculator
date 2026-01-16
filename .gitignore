@@ -2,3 +2,8 @@
 CLAUDE.md
 .claude/
 *.claude
+
+# Node
+node_modules/
+ai-version/node_modules/
+ai-version/dist/
