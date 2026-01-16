@@ -14,7 +14,7 @@ export class LineDetector {
     this.cannyLow = 50; // Canny edge detection low threshold
     this.cannyHigh = 150; // Canny edge detection high threshold
     this.houghThreshold = 80; // Hough transform threshold
-    this.angleToleranceDeg = 20; // Degrees tolerance for "horizontal"
+    this.verticalToleranceDeg = 25; // Degrees tolerance to exclude vertical lines (touchlines)
   }
 
   /**
@@ -71,20 +71,28 @@ export class LineDetector {
         const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
         const absAngle = Math.abs(angle);
 
-        // Filter for roughly horizontal lines
-        // Horizontal = 0 degrees or 180 degrees
-        if (absAngle <= this.angleToleranceDeg || absAngle >= 180 - this.angleToleranceDeg) {
+        // Filter OUT vertical lines (touchlines) - they converge to a different VP
+        // Vertical = 90 degrees (or -90)
+        // Keep lines that are NOT within ±25° of vertical
+        const isVertical = absAngle >= (90 - this.verticalToleranceDeg) &&
+                          absAngle <= (90 + this.verticalToleranceDeg);
+
+        if (!isVertical) {
           const p1 = { x: x1, y: y1 };
           const p2 = { x: x2, y: y2 };
           const lineEq = createLine(p1, p2);
 
           if (lineEq) {
-            // Calculate confidence based on length and angle precision
+            // Calculate confidence based on length
+            // Longer lines are more likely to be field markings
             const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-            const angleDeviation = Math.min(absAngle, 180 - absAngle);
-            const lengthScore = Math.min(length / 400, 1.0); // Max at 400px
-            const angleScore = 1.0 - angleDeviation / this.angleToleranceDeg;
-            const confidence = lengthScore * 0.4 + angleScore * 0.6;
+            const lengthScore = Math.min(length / 300, 1.0); // Max at 300px
+
+            // Bonus for lines further from vertical (more "transversal")
+            const distFromVertical = Math.abs(90 - absAngle);
+            const verticalScore = Math.min(distFromVertical / 65, 1.0); // Max at 65° from vertical
+
+            const confidence = lengthScore * 0.7 + verticalScore * 0.3;
 
             detectedLines.push({
               id: `ai-${Date.now()}-${i}`,
