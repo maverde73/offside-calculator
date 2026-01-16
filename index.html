@@ -888,32 +888,56 @@ function render() {
   
   // Drawing Preview
   if (drawPt && mousePos) {
-    ctx.beginPath(); ctx.moveTo(drawPt.x, drawPt.y); ctx.lineTo(mousePos.x, mousePos.y);
+    // Per player tool, calcola preview verticale
+    const previewPt = (tool === 'player') ? {x: drawPt.x, y: mousePos.y} : mousePos;
+
     if (tool === 'player') {
-        // Preview: Plumb style
-        ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2/view.scale;
-        ctx.setLineDash([2/view.scale, 3/view.scale]); ctx.stroke();
-        
-        // Preview: Top Marker
+        // LINEA GUIDA ORIZZONTALE - mostra il livello del terreno
+        // Disegna prima per non coprire gli altri elementi
+        const dr = {
+            left: -view.x/view.scale - 200,
+            top: -view.y/view.scale - 200,
+            right: (canvas.width - view.x)/view.scale + 200,
+            bottom: (canvas.height - view.y)/view.scale + 200
+        };
+        ctx.beginPath();
+        ctx.moveTo(dr.left, mousePos.y);
+        ctx.lineTo(dr.right, mousePos.y);
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.3)'; // cyan semi-trasparente
+        ctx.lineWidth = 1/view.scale;
+        ctx.setLineDash([8/view.scale, 4/view.scale]); // tratteggiata
+        ctx.stroke();
+
+        // Rendering del preview della linea verticale usando previewPt
+        ctx.beginPath();
+        ctx.moveTo(drawPt.x, drawPt.y);
+        ctx.lineTo(previewPt.x, previewPt.y);
+        ctx.strokeStyle = '#22d3ee';
+        ctx.lineWidth = 2/view.scale;
+        ctx.setLineDash([2/view.scale, 3/view.scale]); // dotted
+        ctx.stroke();
+
+        // Marker top (corpo)
         ctx.beginPath(); ctx.arc(drawPt.x, drawPt.y, 4/view.scale, 0, Math.PI*2);
         ctx.fillStyle = '#22d3ee'; ctx.fill();
 
-        // Preview: Bottom Marker (X) at mouse
+        // Marker bottom (crosshair a terra)
         const cs = 5/view.scale;
         ctx.beginPath();
-        ctx.moveTo(mousePos.x - cs, mousePos.y - cs); ctx.lineTo(mousePos.x + cs, mousePos.y + cs);
-        ctx.moveTo(mousePos.x + cs, mousePos.y - cs); ctx.lineTo(mousePos.x - cs, mousePos.y + cs);
+        ctx.moveTo(previewPt.x - cs, previewPt.y - cs); ctx.lineTo(previewPt.x + cs, previewPt.y + cs);
+        ctx.moveTo(previewPt.x + cs, previewPt.y - cs); ctx.lineTo(previewPt.x - cs, previewPt.y + cs);
         ctx.strokeStyle = '#22d3ee'; ctx.setLineDash([]); ctx.lineWidth = 2/view.scale; ctx.stroke();
 
-        // Preview: Ghost offside line
+        // Preview ghost offside line
         if (vpPos) {
-             ctx.beginPath(); ctx.moveTo(mousePos.x, mousePos.y); ctx.lineTo(vpPos.x, vpPos.y);
+             ctx.beginPath(); ctx.moveTo(previewPt.x, previewPt.y); ctx.lineTo(vpPos.x, vpPos.y);
              ctx.strokeStyle = 'rgba(249, 115, 22, 0.4)'; ctx.setLineDash([]); ctx.stroke();
         }
     } else {
         // Preview: Normal Line style
+        ctx.beginPath(); ctx.moveTo(drawPt.x, drawPt.y); ctx.lineTo(previewPt.x, previewPt.y);
         ctx.strokeStyle = 'rgba(0, 255, 135, 0.6)'; ctx.lineWidth = 2/view.scale;
-        ctx.setLineDash([8/view.scale, 4/view.scale]); ctx.stroke(); 
+        ctx.setLineDash([8/view.scale, 4/view.scale]); ctx.stroke();
         ctx.setLineDash([]);
         ctx.beginPath(); ctx.arc(drawPt.x, drawPt.y, 4/view.scale, 0, Math.PI*2);
         ctx.fillStyle = '#00ff87'; ctx.fill();
@@ -986,12 +1010,15 @@ canvas.addEventListener('mousedown', e => {
   else if (tool === 'player') {
       if (!drawPt) { drawPt = pos; } // Click 1: Body
       else { // Click 2: Ground
-          const plumb = createLine(drawPt, pos);
+          // Calcola punto a terra con proiezione verticale (stessa X del corpo)
+          const groundPt = {x: drawPt.x, y: pos.y};
+
+          const plumb = createLine(drawPt, groundPt);
           if (plumb) {
               lines.push({id: Date.now(), geo: plumb, isVP: false, isPlumb: true, color: '#22d3ee'});
               if (vpPos) { // Auto create Offside line
-                  const vpL = createLine(vpPos, pos);
-                  if (vpL) lines.push({id: Date.now()+1, geo: vpL, isVP: true, srcPt: pos, color: '#f97316'});
+                  const vpL = createLine(vpPos, groundPt);
+                  if (vpL) lines.push({id: Date.now()+1, geo: vpL, isVP: true, srcPt: groundPt, color: '#f97316'});
               }
               saveHistory();
           }
